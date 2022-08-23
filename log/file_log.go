@@ -13,19 +13,19 @@ type FileTransactionLogger struct {
 	lastSequence uint64
 }
 
-func (l FileTransactionLogger) WriteDelete(key string) {
+func (l *FileTransactionLogger) WriteDelete(key string) {
 	l.events <- Event{EventType: EventDelete, Key: key}
 }
 
-func (l FileTransactionLogger) WritePut(key, value string) {
+func (l *FileTransactionLogger) WritePut(key, value string) {
 	l.events <- Event{EventType: EventPut, Key: key, Value: value}
 }
 
-func (l FileTransactionLogger) Err() <-chan error {
+func (l *FileTransactionLogger) Err() <-chan error {
 	return l.errors
 }
 
-func (l FileTransactionLogger) Run() {
+func (l *FileTransactionLogger) Run() {
 	events := make(chan Event, 16)
 	l.events = events
 
