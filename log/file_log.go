@@ -1,6 +1,7 @@
 package log
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 )
@@ -42,6 +43,46 @@ func (l FileTransactionLogger) Run() {
 			}
 		}
 	}()
+}
+
+func (l FileTransactionLogger) ReadEvents() (<-chan Event, <-chan error) {
+	scanner := bufio.NewScanner(l.file)
+	outEvent := make(chan Event)
+	outError := make(chan error, 1)
+
+	go func() {
+		var e Event
+
+		defer close(outEvent)
+		defer close(outError)
+
+		for scanner.Scan() {
+			line := scanner.Text()
+
+			if _, err := fmt.Sscanf(line, "%d\t%d\t%s\t%s", &e.Sequence, &e.EventType, &e.Key, &e.Value); err != nil {
+				outError <- err
+				return
+			}
+
+			if l.lastSequence >= e.Sequence {
+				outError <- fmt.Errorf("transaction numbers out of sequence")
+
+				return
+			}
+
+			l.lastSequence = e.Sequence
+
+			outEvent <- e
+		}
+
+		if err := scanner.Err(); err != nil {
+			outError <- fmt.Errorf("transaction log read failure: %w", err)
+
+			return
+		}
+	}()
+
+	return outEvent, outError
 }
 
 func NewFileTransactionLogger(fileName string) (TransactionLogger, error) {

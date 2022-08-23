@@ -36,6 +36,18 @@ func keyValuePutHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
+func keyValueDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	key := vars["key"]
+	err := Delete(key)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func keyValueGetHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	key := vars["key"]
@@ -57,22 +69,30 @@ func main() {
 
 	r.HandleFunc("/v1/{key}", keyValuePutHandler).Methods("PUT")
 	r.HandleFunc("/v1/{key}", keyValueGetHandler).Methods("GET")
+	r.HandleFunc("/v1/{key}", keyValueDeleteHandler).Methods("DELETE")
+
+	err := InitializeTransactionLog()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
 
 func Put(key string, value string) error {
 	store.Lock()
+	defer store.Unlock()
 	store.m[key] = value
-	store.Unlock()
+	logger.WritePut(key, value)
 
 	return nil
 }
 
 func Get(key string) (string, error) {
 	store.RLock()
+	defer store.RUnlock()
 	value, ok := store.m[key]
-	store.RUnlock()
 
 	if !ok {
 		return "", ErrorNoSuchKey
@@ -83,8 +103,10 @@ func Get(key string) (string, error) {
 
 func Delete(key string) error {
 	store.Lock()
+	defer store.Unlock()
+
 	delete(store.m, key)
-	store.Unlock()
+	logger.WriteDelete(key)
 
 	return nil
 }
