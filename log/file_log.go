@@ -45,7 +45,7 @@ func (l *FileTransactionLogger) Run() {
 	}()
 }
 
-func (l FileTransactionLogger) ReadEvents() (<-chan Event, <-chan error) {
+func (l *FileTransactionLogger) ReadEvents() (<-chan Event, <-chan error) {
 	scanner := bufio.NewScanner(l.file)
 	outEvent := make(chan Event)
 	outError := make(chan error, 1)
